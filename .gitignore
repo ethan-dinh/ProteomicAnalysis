@@ -12,6 +12,7 @@
 .DS_store
 Data
 config.csv
+*.qs
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
