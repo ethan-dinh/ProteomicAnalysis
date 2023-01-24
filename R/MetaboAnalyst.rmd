@@ -1,0 +1,195 @@
+---
+title: "Streamlined R Studio Implementation of MetaboAnalyst"
+author: "Ethan Dinh"
+output: 
+    html_document:
+        theme: spacelab
+        toc: yes
+        toc_depth: 5
+        tock_float:
+            collapsed: yes
+            smooth_scroll: yes
+        html_document:
+            toc: yes
+            toc_depth: '5'
+            df_print: paged
+        pdf_document:
+            toc: yes
+            toc_depth: '5'
+---
+
+```{r setup, echo=FALSE}
+# Set global options for notebook
+
+# Root Directory
+knitr::opts_knit$set(root.dir = normalizePath("~/Knight Campus/Projects/SOMA Data Analysis/SOMA Proteomic Panel Analysis/"))
+
+# Knitting Configurations
+knitr::opts_chunk$set(
+    fig.width = 10,
+    fig.height = 8,
+    warning = FALSE,
+    message = FALSE
+)
+```
+
+# Installing required dependencies for MetaboAnalyst
+
+```{r, include = FALSE}
+# Defining required packages
+metr_pkgs <- c(
+  "impute", "pcaMethods", "globaltest", "GlobalAncova", "Rgraphviz", "preprocessCore", "genefilter", "sva", 
+  "limma", "KEGGgraph", "siggenes", "BiocParallel", "MSnbase", "multtest", "RBGL", "edgeR", "fgsea", 
+  "devtools", "crmn", "qvalue", "SSPA"
+  )
+
+# Defining a function to install missing packages
+install_packages <- function(packages) {
+    # Initialize a list containing all currently installed packages
+    list_installed <- installed.packages()
+
+    # Checks which packages are not installed
+    new_pkgs <- subset(packages, !(packages %in% list_installed[, "Package"]))
+
+    # Installs the remaining required packages
+    if (length(new_pkgs) != 0) {
+        if (!requireNamespace("BiocManager", quietly = TRUE))
+            install.packages("BiocManager") 
+            BiocManager::install(new_pkgs)
+        }
+
+    if ((length(new_pkgs) < 1)) {
+            print("No new packages added...")
+        }
+
+    # Loading the required packages
+    lapply(packages, library, character.only = TRUE)
+} 
+
+install_packages(metr_pkgs)
+```
+
+### Installing the MetaboAnalystR Package
+
+```{r}
+library(devtools)
+
+# Install MetaboAnalystR with documentation
+devtools::install_github("xia-lab/MetaboAnalystR", build = TRUE, build_vignettes = TRUE, build_manual =T)
+```
+
+### Setting up the user defined parameter space
+
+```{r}
+# Declare the path to the data files
+data_path <- "/Users/ethandinh/Knight Campus/Projects/SOMA Data Analysis/SOMA Proteomic Panel Analysis/Data"
+
+# Setup wizard function - Calls helper functions to create a csv file containing user defined parameter space
+setup_wizard <- function() {
+    cat(paste0("Current Path: ", data_path), fill = TRUE)
+    cat("Listing data files: ", fill = TRUE)
+    cat(paste(shQuote(list.files(path = data_path, pattern = NULL, all.files = FALSE, full.names = FALSE), type="cmd"), collapse=", "), fill = TRUE)
+    user_param()
+}
+
+user_param <- function() {
+    var <- readline(prompt = "Are all of the data files present? (y/n): ")
+    if (var == "y") {
+        cat("Loading in current parameter space!", fill = TRUE)
+        if (!(file.exists("config.csv"))) {
+            cat("Parameter space does not exist!", fill = TRUE)
+            var <- readline(prompt = "Would you like to create a new param file? (y/n): ")
+            if (var == "y") {
+                create_param()
+            }
+        } else {
+          config <<- read_csv("config.csv")
+          cat("Successfully loaded in current parameter space!", fill = TRUE)
+        }
+    }
+}
+
+create_param <- function() {
+  # Initialize a list to contain all of the user defined parameters
+  parameters <<- list()
+  
+  # Calling user input functions:
+  data_filtering()
+  
+  # Consildating the parameters into a list of lists
+  parameters = list(missing_values = filter_params)
+
+  # Creating a temporary data file containing all of the parameters
+  tmp <<- sapply(parameters, '[', seq(max(sapply(parameters, length))))
+  
+  # Writing to a config csv file
+  write.csv(tmp, "config.csv", row.names=FALSE)
+  cat("Successfully created the configuration file!")
+}
+```
+
+Defining functions to create the configuration files: Processing Steps
+```{r}
+# Data Filtering
+data_filtering <- function() {
+  percent <- readline(prompt = "Input the percentage cut-off you wish to use (0-1): ")
+  opt <- readline(prompt = "Select the option to replace missing variables - (min, mean, median, KNN, PPCA, BPCA, svdImpute): ")
+  missing_values <<- c(percent, opt)
+}
+```
+
+### Missing Value Estimation
+Too many missing values will cause difficulties for downstream analysis. There are several different methods for this purpose. The default method replaces all the missing values with a small values (the half of the minimum positive values in the original data) assuming to be the detection limit. Click next if you want to use the default method. The assumption of this approach is that most missing values are caused by low abundance metabolites (i.e. below the detection limit).
+
+MetaboAnalyst also offers other methods, such as replace by mean/median, k-nearest neighbours based on similar features - KNN (feature-wise), k-nearest neighbours based on similar samples - KNN (sample-wise), probabilistic PCA (PPCA), Bayesian PCA (BPCA) method, singular value decomposition (SVD) method to impute the missing values (ref.). Note for KNN, k is set to 10 (the default value). Please choose the one that is the most appropriate for your data.
+q
+```{r}
+missingValueEstimation <- function(mSet) {
+  if (as.double(config$missing_values[1] > 0)) {
+    mSet<-RemoveMissingPercent(mSet, percent = config$missing_values[1])
+    mSet<-ImputeMissingVar(mSet, method = config$missing_values[2])
+  }
+}
+```
+
+### Data Filtering
+The purpose of the data filtering is to identify and remove variables that are unlikely to be of use when modeling the data. No phenotype information are used in the filtering process, so the result can be used with any downstream analysis. This step is strongly recommended for untargeted metabolomics datasets (i.e. spectral binning data, peak lists) with large number of variables, many of them are from baseline noises. Filtering can usually improve the results. For details, please refer to the paper by Hackstadt, et al.
+
+Non-informative variables can be characterized in three groups: 1) variables of very small values (close to baseline or detection limit) - these variables can be detected using mean or median; 2) variables that are near-constant values throughout the experiment conditions (housekeeping or homeostasis) - these variables can be detected using standard deviation (SD); or the robust estimate such as interquantile range (IQR); and 3) variables that show low repeatability - this can be measured using QC samples using the relative standard deviation(RSD = SD/mean). Features with high percent RSD should be removed from the subsequent analysis (the suggested threshold is 20% for LC-MS and 30% for GC-MS). For data filtering based on the first two categories, the following empirical rules are applied during data filtering:
+
+Less than 250 variables: 5% will be filtered;
+Between 250 - 500 variables: 10% will be filtered;
+Between 500 - 1000 variables: 25% will be filtered;
+Over 1000 variables: 40% will be filtered;
+
+```{r}
+filterValues <- function(mSet) {
+  if (mv_params[1] > 0) {
+    mSet<-RemoveMissingPercent(mSet, percent = config$missing_values[1])
+    mSet<-ImputeMissingVar(mSet, method = config$missing_values[2])
+  }
+}
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+# Loading in the required libraries for MetaboAnalyst
+lapply(c("readr", "MetaboAnalystR"), require, character.only = TRUE)
+
+# Loading in the data set
+data_path = "Data/Soma__t1_up_to_t3_average_removed_bad_reads.csv"
+
+# Initializing a MetaboAnalyst object to store the data
+mSet <- InitDataObjects("conc", "stat", FALSE)
+
+# Reading in the data from the designated path
+mSet <- Read.TextData(mSet, data_path, "rowu", "disc");
+
+# Validating the Data will work for statistical analysis
+mSet <- SanityCheckData(mSet)
+```
+
+### Launching the Setup Wizard
+
+```{r}
+setup_wizard()
+```
