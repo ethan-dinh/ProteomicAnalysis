@@ -129,6 +129,7 @@ create_param <- function() {
 ```
 
 Defining functions to create the configuration files: Processing Steps
+
 ```{r}
 # Data Filtering
 data_filtering <- function() {
@@ -139,10 +140,11 @@ data_filtering <- function() {
 ```
 
 ### Missing Value Estimation
+
 Too many missing values will cause difficulties for downstream analysis. There are several different methods for this purpose. The default method replaces all the missing values with a small values (the half of the minimum positive values in the original data) assuming to be the detection limit. Click next if you want to use the default method. The assumption of this approach is that most missing values are caused by low abundance metabolites (i.e. below the detection limit).
 
-MetaboAnalyst also offers other methods, such as replace by mean/median, k-nearest neighbours based on similar features - KNN (feature-wise), k-nearest neighbours based on similar samples - KNN (sample-wise), probabilistic PCA (PPCA), Bayesian PCA (BPCA) method, singular value decomposition (SVD) method to impute the missing values (ref.). Note for KNN, k is set to 10 (the default value). Please choose the one that is the most appropriate for your data.
-q
+MetaboAnalyst also offers other methods, such as replace by mean/median, k-nearest neighbours based on similar features - KNN (feature-wise), k-nearest neighbours based on similar samples - KNN (sample-wise), probabilistic PCA (PPCA), Bayesian PCA (BPCA) method, singular value decomposition (SVD) method to impute the missing values (ref.). Note for KNN, k is set to 10 (the default value). Please choose the one that is the most appropriate for your data. q
+
 ```{r}
 missingValueEstimation <- function(mSet) {
   if (as.double(config$missing_values[1] > 0)) {
@@ -153,14 +155,12 @@ missingValueEstimation <- function(mSet) {
 ```
 
 ### Data Filtering
+
 The purpose of the data filtering is to identify and remove variables that are unlikely to be of use when modeling the data. No phenotype information are used in the filtering process, so the result can be used with any downstream analysis. This step is strongly recommended for untargeted metabolomics datasets (i.e. spectral binning data, peak lists) with large number of variables, many of them are from baseline noises. Filtering can usually improve the results. For details, please refer to the paper by Hackstadt, et al.
 
 Non-informative variables can be characterized in three groups: 1) variables of very small values (close to baseline or detection limit) - these variables can be detected using mean or median; 2) variables that are near-constant values throughout the experiment conditions (housekeeping or homeostasis) - these variables can be detected using standard deviation (SD); or the robust estimate such as interquantile range (IQR); and 3) variables that show low repeatability - this can be measured using QC samples using the relative standard deviation(RSD = SD/mean). Features with high percent RSD should be removed from the subsequent analysis (the suggested threshold is 20% for LC-MS and 30% for GC-MS). For data filtering based on the first two categories, the following empirical rules are applied during data filtering:
 
-Less than 250 variables: 5% will be filtered;
-Between 250 - 500 variables: 10% will be filtered;
-Between 500 - 1000 variables: 25% will be filtered;
-Over 1000 variables: 40% will be filtered;
+Less than 250 variables: 5% will be filtered; Between 250 - 500 variables: 10% will be filtered; Between 500 - 1000 variables: 25% will be filtered; Over 1000 variables: 40% will be filtered;
 
 ```{r}
 filterValues <- function(mSet) {
@@ -191,5 +191,31 @@ mSet <- SanityCheckData(mSet)
 ### Launching the Setup Wizard
 
 ```{r}
-setup_wizard()
+data_path = "Data/Soma plus MGH repeat measures.csv"
+meta_path = "Data/Soma plus MGH repeat measures meta.csv"
+
+mSet <- InitDataObjects("conc", "mf", FALSE)
+mSet <- SetDesignType(mSet, "Time")
+
+mSet<-Read.TextDataTs(mSet, "Data/Soma plus MGH repeat measures.csv", "rowmf");
+mSet<-ReadMetaData(mSet, "Data/Soma plus MGH repeat measures meta.csv");
+
+mSet<-SanityCheckData(mSet)
+mSet<-RemoveMissingPercent(mSet, percent=0.5)
+mSet<-ImputeMissingVar(mSet, method="exclude")
+
+mSet<-SanityCheckMeta(mSet, 1)
+
+mSet<-FilterVariable(mSet, "none", "F", 25)
+
+mSet<-PreparePrenormData(mSet)
+mSet<-Normalization(mSet, "NULL", "NULL", "NULL", ratio=FALSE, ratioNum=20)
+```
+
+```{r}
+meta.vec.mb <- c("Phenotype", "Time")
+mSet<-PlotMBTimeProfile(mSet, "PTH1R", 0, "png", 100, width=10)
+mSet<-PlotMBTimeProfile(mSet, "PTHrP", 0, "png", 100, width=10)
+mSet<-PlotMBTimeProfile(mSet, "PTH", 0, "png", 100, width=10)
+mSet<-PlotMBTimeProfile(mSet, "Parathyroid Hormone1-34", 0, "png", 100, width=10)
 ```
