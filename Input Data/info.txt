@@ -20,10 +20,17 @@ Metafile
 	|		* Missing remaining 6 sample analyses from SOMA Logic
 	|
 	|_ Normalized to T1 (No T1)
+	|	|
+	|	|_ Soma plus MGH normalized measures (NO T1).csv
+	|	|	* Same as normalized data but T1 is recusively removed
+	|	|
+	|	|_ Soma plus MGH repeat measures meta (NO T1).csv
+	|		* Removed T1 from the meta data to avoid errors with MetaboAnalyst
+	|
+	|_ Averaged Time Points (Pre/Post Refracture)
 		|
-		|_ Soma plus MGH normalized measures (NO T1).csv
-		|	* Same as normalized data but T1 is recusively removed
+		|_ Soma plus MGH repeat measures (AVG T1-T3).csv
+		|	* Averaged readings from T1, T2, and T3 – pre-refracture
 		|
-		|_ Soma plus MGH repeat measures meta (NO T1).csv
-			* Removed T1 from the meta data to avoid errors with MetaboAnalyst
-	
+		|_ Soma plus MGH repeat measures (AVG T4-T5).csv
+			* Averaged readings from T4 and T5 – post-refracture
