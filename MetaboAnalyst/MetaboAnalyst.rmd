@@ -22,7 +22,7 @@ output:
 # Set global options for notebook
 
 # Root Directory
-knitr::opts_knit$set(root.dir = normalizePath("~/Knight Campus/Projects/SOMA Data Analysis/SOMA Proteomic Panel Analysis/"))
+knitr::opts_knit$set(root.dir = normalizePath("~/Knight Campus/Projects/SOMA Data Analysis/SOMA Proteomic Panel Analysis/MetaboAnalyst/R Temporary Files"))
 
 # Knitting Configurations
 knitr::opts_chunk$set(
@@ -34,6 +34,7 @@ knitr::opts_chunk$set(
 ```
 
 # Installing required dependencies for MetaboAnalyst
+Run this in order to prepare the environment for the MetaboAnlayst analyses
 
 ```{r, include = FALSE}
 # Defining required packages
@@ -70,6 +71,7 @@ install_packages(metr_pkgs)
 ```
 
 ### Installing the MetaboAnalystR Package
+Utilize devtools to install all the necessary dependencies for the MetaboAnalyst R package
 
 ```{r}
 library(devtools)
@@ -79,6 +81,7 @@ devtools::install_github("xia-lab/MetaboAnalystR", build = TRUE, build_vignettes
 ```
 
 ### Setting up the user defined parameter space
+The setup wizard prepares a configuration file for the data preprocessing protocols
 
 ```{r}
 # Declare the path to the data files
@@ -171,34 +174,24 @@ filterValues <- function(mSet) {
 }
 ```
 
+# Initialize the MetaboAnalyst Package
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
 # Loading in the required libraries for MetaboAnalyst
 lapply(c("readr", "MetaboAnalystR"), require, character.only = TRUE)
-
-# Loading in the data set
-data_path = "Data/Soma__t1_up_to_t3_average_removed_bad_reads.csv"
-
-# Initializing a MetaboAnalyst object to store the data
-mSet <- InitDataObjects("conc", "stat", FALSE)
-
-# Reading in the data from the designated path
-mSet <- Read.TextData(mSet, data_path, "rowu", "disc");
-
-# Validating the Data will work for statistical analysis
-mSet <- SanityCheckData(mSet)
 ```
 
 ### Launching the Setup Wizard
-
 ```{r}
-data_path = "Data/Soma plus MGH normalized measures.csv"
-meta_path = "Data/Soma plus MGH repeat measures meta.csv"
+root_path = "../../Input Data/Normalized to T1 (no T1)/"
+data_path = paste(root_path, "Soma plus MGH normalized measures (NO T1).csv", sep = "")
+meta_path = paste(root_path, "Soma plus MGH repeat measures meta (NO T1).csv", sep = "")
 
 mSet <- InitDataObjects("conc", "mf", FALSE)
 mSet <- SetDesignType(mSet, "Time")
 
-mSet<-Read.TextDataTs(mSet, "Data/Soma plus MGH normalized measures (NO T1).csv", "rowmf");
-mSet<-ReadMetaData(mSet, "Data/Soma plus MGH repeat measures meta (NO T1).csv");
+mSet<-Read.TextDataTs(mSet, data_path, "rowmf");
+mSet<-ReadMetaData(mSet, meta_path);
 
 mSet<-SanityCheckData(mSet)
 mSet<-RemoveMissingPercent(mSet, percent=0.5)
@@ -220,5 +213,5 @@ mSet<-PlotMBTimeProfile(mSet, "PTH", 0, "png", 100, width=10)
 mSet<-PlotMBTimeProfile(mSet, "Parathyroid Hormone1-34", 0, "png", 100, width=10)
 mSet<-PlotMBTimeProfile(mSet, "TSH", 0, "png", 100, width=10)
 mSet<-PlotMBTimeProfile(mSet, "Thyroxine-Binding Globulin", 0, "png", 100, width=10)
-
+mSet<-PlotMBTimeProfile(mSet, "FAAA", 0, "png", 100, width=10)
 ```
